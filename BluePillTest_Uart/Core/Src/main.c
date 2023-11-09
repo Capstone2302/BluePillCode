@@ -94,7 +94,7 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   uint8_t message[50] = {'\0'};
-  uint8_t state = 3;
+  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -102,14 +102,9 @@ int main(void)
   while (1)
   {
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4))
-		  state = 1;
-	  else
-		  state = 0;
-//	  sprintf(message, "Encoder Ticks = %d\n\r", ((TIM2->CNT)>>2));
-	  sprintf(message, "Encoder State = %d\n\r", state);
+	  sprintf(message, "Encoder Ticks = %d\n\r", ((TIM2->CNT)>>2));
       HAL_UART_Transmit(&huart1, message, sizeof(message), 100);
-      HAL_Delay(100);
+      HAL_Delay(75);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
