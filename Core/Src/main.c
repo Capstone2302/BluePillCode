@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -45,21 +44,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
 
-/* Definitions for blink01 */
-osThreadId_t blink01Handle;
-const osThreadAttr_t blink01_attributes = {
-  .name = "blink01",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for MotorTask */
-osThreadId_t MotorTaskHandle;
-const osThreadAttr_t MotorTask_attributes = {
-  .name = "MotorTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -67,12 +53,10 @@ const osThreadAttr_t MotorTask_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
-void StartBlink01(void *argument);
-void StartMotorTask(void *argument);
-
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -110,58 +94,35 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  uint8_t message[12] = {'\0'};
+  uint8_t num = 0;
+  uint8_t Rx_data[12];  //  creating a buffer of 10 bytes
 
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* creation of blink01 */
-  blink01Handle = osThreadNew(StartBlink01, NULL, &blink01_attributes);
-
-  /* creation of MotorTask */
-  MotorTaskHandle = osThreadNew(StartMotorTask, NULL, &MotorTask_attributes);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
-  /* Start scheduler */
-  osKernelStart();
-
-  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  uint8_t buffer[8];
+	  sprintf(message, "%d\r\n", num);
+	  HAL_UART_Transmit(&huart2, (uint8_t *)message, sizeof(message), 100);
+	  HAL_UART_Receive_DMA(&huart2, Rx_data, 12);
+	  num++;
+	  HAL_Delay (250);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+  }
+  void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+  {
+      HAL_UART_Transmit(&huart2,  (uint8_t *)message, sizeof(message), 100);
+      HAL_UART_Receive_DMA(&huart2,  Rx_data, 12);
   }
   /* USER CODE END 3 */
 }
@@ -337,6 +298,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -379,67 +356,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
-/* USER CODE BEGIN Header_StartBlink01 */
-/**
-  * @brief  Function implementing the blink01 thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartBlink01 */
-void StartBlink01(void *argument)
-{
-  /* USER CODE BEGIN 5 */
-	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
-	uint8_t message[50] = {'\0'};
-  /* Infinite loop */
-  for(;;)
-  {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    sprintf(message, "Encoder Ticks = %d\n\r", ((TIM2->CNT)>>2));
-	HAL_UART_Transmit(&huart2, message, sizeof(message), 100);
-    osDelay(10);
-  }
-  /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartMotorTask */
-/**
-* @brief Function implementing the MotorTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartMotorTask */
-void StartMotorTask(void *argument)
-{
-  /* USER CODE BEGIN StartMotorTask */
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  int32_t dutyCycle = 1000;
-  uint8_t buffer[4];
-  int32_t buff_num = 0;
-  /* Infinite loop */
-  for(;;)
-  {
-	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-//	  for (dutyCycle = 0; dutyCycle < 50000; dutyCycle += 100) // 65535 is the max
-//	        {
-//	            TIM3->CCR1 = dutyCycle;
-//	            osDelay(100);
-//	        }
-//	  if(HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100))
-//		  buff_num = buffer[0]; // + buffer[1]*10 +  buffer[2]*100 +  buffer[3]*1000;
-//		  if(buff_num >  50 && buff_num < 65535)
-//			  dutyCycle = buff_num;
-//
-//	  TIM3->CCR1 = dutyCycle;
-//      osDelay(100);
-
-	  HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100);
-	  buff_num = sizeof(buffer);
-
-  }
-  /* USER CODE END StartMotorTask */
-}
 
 /**
   * @brief  This function is executed in case of error occurrence.
