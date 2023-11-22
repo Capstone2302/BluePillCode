@@ -41,6 +41,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
@@ -68,6 +69,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM2_Init(void);
 void StartBlink01(void *argument);
 void StartMotorTask(void *argument);
 
@@ -110,6 +112,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -200,6 +203,55 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 10;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 0;
+  if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
 }
 
 /**
@@ -338,15 +390,15 @@ static void MX_GPIO_Init(void)
 void StartBlink01(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	uint8_t message[35] = {'\0'};
-	uint8_t num = 0;
+	HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
+	uint8_t message[50] = {'\0'};
   /* Infinite loop */
   for(;;)
   {
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	sprintf(message, "Welcome to lab! Counting = %d\r\n", num);
+    sprintf(message, "Encoder Ticks = %d\n\r", ((TIM2->CNT)>>2));
 	HAL_UART_Transmit(&huart2, message, sizeof(message), 100);
-    osDelay(500);
+    osDelay(10);
   }
   /* USER CODE END 5 */
 }
@@ -362,21 +414,32 @@ void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  int32_t dutyCycle = 0;
+  int32_t dutyCycle = 1000;
+  uint8_t buffer[4];
+  int32_t buff_num = 0;
   /* Infinite loop */
   for(;;)
   {
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-	  for (dutyCycle = 0; dutyCycle < 50000; dutyCycle += 100) // 65535 is the max
-	        {
-	            TIM3->CCR1 = dutyCycle;
-	            osDelay(100);
-	        }
-      osDelay(100);
+//	  for (dutyCycle = 0; dutyCycle < 50000; dutyCycle += 100) // 65535 is the max
+//	        {
+//	            TIM3->CCR1 = dutyCycle;
+//	            osDelay(100);
+//	        }
+//	  if(HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100))
+//		  buff_num = buffer[0]; // + buffer[1]*10 +  buffer[2]*100 +  buffer[3]*1000;
+//		  if(buff_num >  50 && buff_num < 65535)
+//			  dutyCycle = buff_num;
+//
+//	  TIM3->CCR1 = dutyCycle;
+//      osDelay(100);
+
+	  HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100);
+	  buff_num = sizeof(buffer);
+
   }
   /* USER CODE END StartMotorTask */
 }
-
 
 /**
   * @brief  This function is executed in case of error occurrence.
