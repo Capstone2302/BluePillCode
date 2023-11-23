@@ -45,6 +45,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* Definitions for blink01 */
 osThreadId_t blink01Handle;
@@ -67,6 +68,7 @@ const osThreadAttr_t MotorTask_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
@@ -110,6 +112,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
@@ -337,6 +340,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -414,29 +433,23 @@ void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  int32_t dutyCycle = 1000;
-  uint8_t buffer[4];
-  int32_t buff_num = 0;
+  int32_t dutyCycle = 100;
+  uint8_t Rx_data[4];
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-//	  for (dutyCycle = 0; dutyCycle < 50000; dutyCycle += 100) // 65535 is the max
-//	        {
-//	            TIM3->CCR1 = dutyCycle;
-//	            osDelay(100);
-//	        }
-//	  if(HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100))
-//		  buff_num = buffer[0]; // + buffer[1]*10 +  buffer[2]*100 +  buffer[3]*1000;
-//		  if(buff_num >  50 && buff_num < 65535)
-//			  dutyCycle = buff_num;
-//
-//	  TIM3->CCR1 = dutyCycle;
-//      osDelay(100);
-
-	  HAL_UART_Receive(&huart2, buffer, sizeof(buffer), 100);
-	  buff_num = sizeof(buffer);
-
+//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	  HAL_UART_Receive_DMA(&huart2, Rx_data, 4);
+      dutyCycle = (Rx_data[0]- '0')*1000 + (Rx_data[1]-'0')*100 + (Rx_data[2]-'0')*10 + (Rx_data[3]-'0');
+      if(dutyCycle < 45535)
+      	  TIM3->CCR1 = dutyCycle;
+      else
+    	  TIM3->CCR1 = 0;
+      osDelay(250);
+  }
+  void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+  {
+      HAL_UART_Receive_DMA(&huart2,  Rx_data, sizeof(Rx_data));
   }
   /* USER CODE END StartMotorTask */
 }
