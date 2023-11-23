@@ -434,23 +434,48 @@ void StartMotorTask(void *argument)
   /* USER CODE BEGIN StartMotorTask */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   int32_t dutyCycle = 100;
-  uint8_t Rx_data[4];
+  uint8_t RxSize = 10;
+  uint8_t i = 0;
+  uint8_t RxData[RxSize];
   /* Infinite loop */
   for(;;)
   {
-//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-	  HAL_UART_Receive_DMA(&huart2, Rx_data, 4);
-      dutyCycle = (Rx_data[0]- '0')*1000 + (Rx_data[1]-'0')*100 + (Rx_data[2]-'0')*10 + (Rx_data[3]-'0');
+	  i = 0;
+	  dutyCycle = 0;
+	  HAL_UART_Receive_DMA(&huart2, RxData, sizeof(RxData));
+	  if(RxData[i]== '-')
+	  {
+		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	  	  i++;
+	  }
+
+      while(RxData[i] != '\n' && i< sizeof(RxData))
+      {
+    	  dutyCycle = dutyCycle*10 + (RxData[i] - '0');
+      	  i++;
+      }
+	  if(i+1 < sizeof(RxData))
+		  RxData[i+1] = 'p';
+
       if(dutyCycle < 45535)
       	  TIM3->CCR1 = dutyCycle;
       else
     	  TIM3->CCR1 = 0;
+//      while(i< sizeof(RxData) -1)
+//      {
+//    	  i++;
+//    	  RxData[i] = 0;
+//
+//      }
+
       osDelay(250);
   }
-  void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-  {
-      HAL_UART_Receive_DMA(&huart2,  Rx_data, sizeof(Rx_data));
-  }
+//  void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+//  {
+////      HAL_UART_Receive_DMA(&huart2,  RxData, sizeof(RxData));
+//	  for (int i = 0; i < sizeof(RxData); i++)
+//		  RxData[i] = 0;
+//  }
   /* USER CODE END StartMotorTask */
 }
 
