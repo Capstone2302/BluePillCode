@@ -99,30 +99,35 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  uint8_t message[12] = {'\0'};
-  uint8_t num = 0;
-  uint8_t Rx_data[12];  //  creating a buffer of 10 bytes
-
+//  uint8_t message[12] = {'\0'};
+//  uint8_t num = 0;
+  uint8_t Rx_data[4];  //  creating a buffer of 10 bytes
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  int32_t dutyCycle = 100;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint8_t buffer[8];
-	  sprintf(message, "%d\r\n", num);
-	  HAL_UART_Transmit(&huart2, (uint8_t *)message, sizeof(message), 100);
-	  HAL_UART_Receive_DMA(&huart2, Rx_data, 12);
-	  num++;
-	  HAL_Delay (250);
+//	  uint8_t buffer[8];
+//	  sprintf(message, "%d\r\n", num);
+//	  HAL_UART_Transmit(&huart2, (uint8_t *)message, sizeof(message), 100);
+	  HAL_UART_Receive_DMA(&huart2, Rx_data, 4);
+      dutyCycle = (Rx_data[0]- '0')*1000 + (Rx_data[1]-'0')*100 + (Rx_data[2]-'0')*10 + (Rx_data[3]-'0');
+      if(dutyCycle < 45535)
+      	  TIM3->CCR1 = dutyCycle;
+      else
+    	  TIM3->CCR1 = 0;
+      HAL_Delay(250);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
   void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   {
-      HAL_UART_Transmit(&huart2,  (uint8_t *)message, sizeof(message), 100);
-      HAL_UART_Receive_DMA(&huart2,  Rx_data, 12);
+//      HAL_UART_Transmit(&huart2,  (uint8_t *)message, sizeof(message), 100);
+      HAL_UART_Receive_DMA(&huart2,  Rx_data, 4);
   }
   /* USER CODE END 3 */
 }
