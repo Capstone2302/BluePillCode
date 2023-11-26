@@ -414,7 +414,6 @@ void StartBlink01(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     sprintf(message, "Encoder Ticks = %d\n\r", ((TIM2->CNT)>>2));
 	HAL_UART_Transmit(&huart2, message, sizeof(message), 100);
     osDelay(10);
@@ -434,32 +433,32 @@ void StartMotorTask(void *argument)
   /* USER CODE BEGIN StartMotorTask */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   int32_t dutyCycle = 100;
-  uint8_t RxSize = 7;
-  uint8_t i = 0;
-  uint8_t RxData[RxSize];
+//  uint32_t tick = osKernelGetTickCount();
+//  uint32_t wait =  osKernelGetTickFreq();
+  uint8_t RxData[7];
   /* Infinite loop */
   for(;;)
   {
-	  i = 0;
-	  dutyCycle = 0;
-	  HAL_UART_Receive_DMA(&huart2, RxData, sizeof(RxData));
-	  if(RxData[i]== '-')
-	  {
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-	  	  i++;
-	  }
 
-      while(RxData[i] != '\n' && i< sizeof(RxData))
+	  HAL_UART_Receive_DMA(&huart2, RxData, sizeof(RxData));
+	  dutyCycle = 0;
+      for(uint8_t i = 0; RxData[i] != '\n' && i< sizeof(RxData); i++)
       {
+    	  if(RxData[i]== '-')
+    	  {
+    		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    	  }
+
     	  dutyCycle = dutyCycle*10 + (RxData[i] - '0');
-      	  i++;
+
       }
 
       if(dutyCycle < 45535)
       	  TIM3->CCR1 = dutyCycle;
       else
     	  TIM3->CCR1 = 0;
-
+//      tick += wait;
+//      osDelayUntil(tick);
       osDelay(250);
   }
 
