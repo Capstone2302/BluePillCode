@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "encoder_handler.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -61,7 +61,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-
+#define DATA_LENGTH 7
+#define UART_TIMEOUT 100
+#define DUTYCYCLE_MAX 1000
+#define DUTYCYCLE_SCALER UINT16_MAX/1000
+#define WHEEL_M_DIR_GPIO_Port GPIOA
+#define WHEEL_M_DIR_Pin GPIO_PIN_5
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stdio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -63,6 +64,8 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int64_t encoder_delta_position;
+encoder_instance enc_instance;
 
 /* USER CODE END 0 */
 
@@ -99,44 +102,61 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2*/
-  uint8_t message[10] = {'\0'};
-  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  uint8_t RxData[7];
-  int32_t dutyCycle = 100;
+  uint8_t message[DATA_LENGTH] = {'\0'};
+  uint8_t RxData[DATA_LENGTH];
+  int32_t dutyCycle = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  sprintf(message, "%d\r\n", ((TIM2->CNT)>>2));
-	  HAL_UART_Transmit(&huart2, message, sizeof(message), 100);
-	  HAL_UART_Receive_DMA(&huart2, RxData, sizeof(RxData));
 	  dutyCycle = 0;
+	  // measure velocity, position
+	  update_encoder(&enc_instance, &htim2);
+	  encoder_delta_position = enc_instance.delta_position;
+
+	  sprintf(message, "%d\r\n", encoder_delta_position); //add detailed message
+	  HAL_UART_Transmit(&huart2, message, sizeof(message), UART_TIMEOUT);
+	  HAL_UART_Receive_DMA(&huart2, RxData, sizeof(RxData));
+
+	  //check for negative PWM
+ 	  if(RxData[0]== '-')
+ 	  {
+ 		 HAL_GPIO_WritePin(WHEEL_M_DIR_GPIO_Port, WHEEL_M_DIR_Pin, GPIO_PIN_RESET);
+ 	  }
+ 	  else
+ 	  {
+ 		 HAL_GPIO_WritePin(WHEEL_M_DIR_GPIO_Port, WHEEL_M_DIR_Pin, GPIO_PIN_SET);
+ 	  }
+
 	  for(uint8_t i = 0; RxData[i] != '\t' && i< sizeof(RxData); i++)
-	       {
-	     	  if(RxData[i]== '-')
-	     	  {
-	     		 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-	     	  }
-	     	  else
-	     	  {
-	     		 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-	     	  }
+	   {
+		  if(RxData[i]== '-')
+		  {
+			  continue;
+		  }
+		  else
+		  {
+			  //change values from string to integer value
+			  dutyCycle = dutyCycle*10 + (RxData[i] - '0');
+		  }
+	   }
 
-	     	  dutyCycle = dutyCycle*10 + (RxData[i] - '0');
+	  dutyCycle = abs(dutyCycle);
 
-	       }
-
-	  if(dutyCycle < 100)
+	  //push PWM value
+	  if(dutyCycle < DUTYCYCLE_MAX)
 	  {
-		  	  dutyCycle = dutyCycle*UINT16_MAX/100;
+		  	  dutyCycle = dutyCycle*DUTYCYCLE_SCALER;
 	       	  TIM3->CCR1 = dutyCycle;
 	  }
 	  else
-	     	  TIM3->CCR1 = 0;
-	  HAL_Delay(200);
+	  {
+		  TIM3->CCR1 = 0;
+	  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -227,7 +247,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM2_Init 2 */
-
+  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   /* USER CODE END TIM2_Init 2 */
 
 }
@@ -275,7 +295,7 @@ static void MX_TIM3_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM3_Init 2 */
-
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
 
